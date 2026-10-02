@@ -4,6 +4,7 @@
 #include "Components.h"
 
 #include <SFML/Graphics.hpp>
+#include <SFML/System/Vector2.hpp>
 
 #include <memory>
 #include <iostream>
@@ -37,7 +38,7 @@ void Game::quit()
 
 void Game::init()
 {
-	m_window.create(sf::VideoMode({ 768, 512 }), "Magic!", sf::Style::Titlebar | sf::Style::Close);
+	m_window.create(sf::VideoMode({ 768, 512 }), "Magic!", sf::Style::Default);
 	m_window.setFramerateLimit(60);
 
 	constexpr auto bgPath = "assets/fantasy_world_map1.png";
@@ -56,6 +57,8 @@ void Game::init()
 	spawnPlayer();
 	m_fixedCamera.onEnter(makeCameraContext());
 	applyCameraCenter(m_fixedCamera.center());
+	
+	onResize(m_window.getSize());
 	m_running = true;
 }
 
@@ -205,6 +208,31 @@ void Game::sMovement()
 	pTransform.pos += pTransform.velocity;
 }
 
+void Game::onResize(sf::Vector2u newSize)
+{
+	constexpr float targetAspect = 768.f / 512.f;
+	const float windowAspect = static_cast<float>(newSize.x) / static_cast<float>(newSize.y);
+
+	auto viewPort = sf::FloatRect{ {0.f, 0.f}, {1.f, 1.f} };
+
+	if (windowAspect > targetAspect)
+	{
+		// window too wide: bars left and right
+		viewPort.size.x = targetAspect / windowAspect;
+		viewPort.position.x = (1.f - viewPort.size.x) / 2.f;
+	}
+	else
+	{
+		// window too tall: bars top and bottom
+		viewPort.size.y = windowAspect / targetAspect;
+		viewPort.position.y = (1.f - viewPort.size.x) / 2.f;
+	}
+
+	auto view = m_window.getView();
+	view.setViewport(viewPort);
+	m_window.setView(view);
+}
+
 void Game::sPlayerInput()
 {
 	while (const std::optional event = m_window.pollEvent())
@@ -217,11 +245,7 @@ void Game::sPlayerInput()
 		// this handler is dead code, window is created with sf::Style::Close
 		if (const auto* windowResized = event->getIf<sf::Event::Resized>())
 		{
-			// this squishes the bg image into the starting window size when resized down
-			//sf::FloatRect visibleArea({ 0.0f, 0.0f }, { m_worldSize.x, m_worldSize.y });
-			sf::FloatRect visibleArea({ 0.0f, 0.0f }, { static_cast<float>(windowResized->size.x), static_cast<float>(windowResized->size.y) });
-
-			m_window.setView(sf::View(visibleArea));
+			onResize(windowResized->size);
 		}
 
 		if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())

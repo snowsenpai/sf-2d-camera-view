@@ -6,7 +6,10 @@
 #include "EntityManager.h"
 #include "Entity.h"
 
-#include <SFML/Graphics.hpp>
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/Graphics/Sprite.hpp>
+#include <SFML/Graphics/Texture.hpp>
+#include <SFML/System/Vector2.hpp>
 
 #include <memory>
 #include <type_traits>
@@ -40,6 +43,7 @@ class Game
 	void update();
 	void quit();
 	void spawnPlayer();
+	void onResize(sf::Vector2u newSize);
 	
 	void sRender();
 	void sPlayerInput();
