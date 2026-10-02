@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Vec2.h"
 #include "EntityManager.h"
 #include "Entity.h"
 
@@ -8,13 +9,28 @@
 #include <memory>
 #include <type_traits>
 #include <random>
+#include <optional>
 
 class Game
 {
 	EntityManager m_entityManager;
 	sf::RenderWindow m_window;
 	std::shared_ptr<Entity> m_player;
-	
+
+	sf::Texture m_bgTexture;
+	std::optional<sf::Sprite> m_bgImage;
+
+	Vec2 m_worldSize;
+	Vec2 m_cellSize; // fixed camera: one cell == one view
+	sf::Vector2i m_gridSize; // cells per axis (cols, rows), derived from world / cell
+	sf::Vector2i m_currentCell; // the cell the camera is currently showing
+
+	void initFixedCamera();
+	void sFixedCamera();
+	sf::Vector2i cellFromPos(const Vec2& pos) const;
+	Vec2 cellCenter(sf::Vector2i cell) const;
+	void applyCameraCell();
+
 	std::random_device m_randomDevice;
 	mutable std::mt19937 m_engine{ m_randomDevice() }; // seeded once; rng() draws from this, not a fresh engine per call
 
