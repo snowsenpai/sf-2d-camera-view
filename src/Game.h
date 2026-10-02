@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Vec2.h"
+#include "CameraTypes.h"
+#include "FixedCamera.h"
 #include "EntityManager.h"
 #include "Entity.h"
 
@@ -21,15 +23,12 @@ class Game
 	std::optional<sf::Sprite> m_bgImage;
 
 	Vec2 m_worldSize;
-	Vec2 m_cellSize; // fixed camera: one cell == one view
-	sf::Vector2i m_gridSize; // cells per axis (cols, rows), derived from world / cell
-	sf::Vector2i m_currentCell; // the cell the camera is currently showing
 
-	void initFixedCamera();
+	FixedCamera m_fixedCamera;
+	CameraContext makeCameraContext() const;
+	void onCameraEvent(const CameraEvents& ev);
+	void applyCameraCenter(const Vec2& center);
 	void sFixedCamera();
-	sf::Vector2i cellFromPos(const Vec2& pos) const;
-	Vec2 cellCenter(sf::Vector2i cell) const;
-	void applyCameraCell();
 
 	std::random_device m_randomDevice;
 	mutable std::mt19937 m_engine{ m_randomDevice() }; // seeded once; rng() draws from this, not a fresh engine per call
@@ -46,6 +45,8 @@ class Game
 	void sPlayerInput();
 	void sMovement();
 	void sCollision();
+
+	const float kRoomMargin = 4.f;
 
 	template <typename T>
 	T rng(T min, T max) const;

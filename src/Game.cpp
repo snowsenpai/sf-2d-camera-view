@@ -1,14 +1,12 @@
 #include "Game.h"
 #include "Vec2.h"
+#include "CameraTypes.h"
 #include "Components.h"
 
 #include <SFML/Graphics.hpp>
 
 #include <memory>
 #include <iostream>
-#include <cassert>
-#include <cmath>
-#include <algorithm>
 
 void Game::run()
 {
@@ -56,7 +54,8 @@ void Game::init()
 	m_worldSize = { static_cast<float>(bgTextureSize.x), static_cast<float>(bgTextureSize.y) };
 	
 	spawnPlayer();
-	initFixedCamera();
+	m_fixedCamera.onEnter(makeCameraContext());
+	applyCameraCenter(m_fixedCamera.center());
 	m_running = true;
 }
 
@@ -271,80 +270,38 @@ void Game::sPlayerInput()
 	}
 }
 
-void Game::initFixedCamera()
-{
-	auto viewSize = m_window.getView().getSize();
-	m_cellSize = { viewSize.x, viewSize.y };
-
-	m_gridSize = {
-		static_cast<int>(m_worldSize.x / m_cellSize.x),
-		static_cast<int>(m_worldSize.y / m_cellSize.y)
-	};
-
-	// the world must tile exactly with cells, or the view could show void
-	assert(std::fmod(m_worldSize.x, m_cellSize.x) == 0.f);
-	assert(std::fmod(m_worldSize.y, m_cellSize.y) == 0.f);
-
-	m_currentCell = cellFromPos(m_player->getComponent<CTransform>().value().pos);
-	applyCameraCell();
-}
-
-sf::Vector2i Game::cellFromPos(const Vec2& pos) const
-{
-	int col = static_cast<int>(std::floor(pos.x / m_cellSize.x));
-	int row = static_cast<int>(std::floor(pos.y / m_cellSize.y));
-
-	// clamp: a position outside the world still maps to a valid cell
-	return {
-		std::clamp(col, 0, m_gridSize.x - 1),
-		std::clamp(row, 0, m_gridSize.y - 1)
-	};
-}
-
-Vec2 Game::cellCenter(sf::Vector2i cell) const
-{
-	// cells are positioned by top-left, the view by center, hence the + 0.5
-	return { (cell.x + 0.5f) * m_cellSize.x, (cell.y + 0.5f) * m_cellSize.y };
-}
-
-void Game::applyCameraCell()
+void Game::applyCameraCenter(const Vec2& center)
 {
 	auto view = m_window.getView();
-	auto center = cellCenter(m_currentCell);
 	view.setCenter({ center.x, center.y });
 	m_window.setView(view);
 }
 
 void Game::sFixedCamera()
 {
-	auto& pTransform = m_player->getComponent<CTransform>().value();
-	const auto& pBox = m_player->getComponent<CBoundingBox>().value();
+	auto ev = m_fixedCamera.update(makeCameraContext());
+	onCameraEvent(ev);
+	applyCameraCenter(m_fixedCamera.center());
+}
 
-	// player center leaving the cell == more than half the box beyond edge
-	auto newCell = cellFromPos(pTransform.pos);
-	if (newCell == m_currentCell) return;
+CameraContext Game::makeCameraContext() const
+{
+	auto view = m_window.getView().getSize();
+	const auto& pos = m_player->getComponent<CTransform>().value().pos;
+	return { pos, m_worldSize, {view.x, view.y} };
+}
 
-	constexpr float margin = 4.f;
+void Game::onCameraEvent(const CameraEvents& ev)
+{
+	auto& t = m_player->getComponent<CTransform>().value();
+	const auto& box = m_player->getComponent<CBoundingBox>().value();
 
-	int dx = newCell.x - m_currentCell.x;
-	int dy = newCell.y - m_currentCell.y;
-
-	if (dx != 0)
+	if (ev.x)
 	{
-		float dir = dx > 0 ? 1.f : -1.f;
-		// shared edge: new cell's left edge going right, its right edge going left
-		float edgeX = (dx > 0 ? newCell.x : newCell.x + 1) * m_cellSize.x;
-		pTransform.pos.x = edgeX + dir * (pBox.size.x / 2.f + margin);
+		t.pos.x = ev.x->edge + ev.x->dir * (box.size.x / 2.f + kRoomMargin);
 	}
-
-	if (dy != 0)
+	if (ev.y)
 	{
-		float dir = dy > 0 ? 1.f : -1.f;
-		// shared edge: new cell's left edge going right, its right edge going left
-		float edgeY = (dy > 0 ? newCell.y : newCell.y + 1) * m_cellSize.y;
-		pTransform.pos.y = edgeY + dir * (pBox.size.y / 2.f + margin);
+		t.pos.y = ev.y->edge + ev.y->dir * (box.size.y / 2.f + kRoomMargin);
 	}
-
-	m_currentCell = newCell;
-	applyCameraCell();
 }

@@ -18,7 +18,10 @@ add_executable(camera_view
     src/main.cpp
     src/Vec2.h
     src/Vec2.cpp
+    src/CameraTypes.h
     src/Components.h
+    src/FixedCamera.h
+    src/FixedCamera.cpp
     src/Entity.h
     src/Entity.cpp
     src/EntityManager.h
