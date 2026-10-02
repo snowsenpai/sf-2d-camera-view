@@ -2,10 +2,11 @@
 
 #include "Vec2.h"
 #include "CameraTypes.h"
+#include "Camera.h"
 
 #include <SFML/System/Vector2.hpp>
 
-class FixedCamera
+class FixedCamera : public Camera
 {
 	Vec2 m_cellSize; // one cell == one view
 	sf::Vector2i m_gridSize; // cells per axis (cols, rows), derived from world / cell
@@ -13,7 +14,7 @@ class FixedCamera
 
 	sf::Vector2i cellFromPos(const Vec2& pos) const;
 public:
-	void onEnter(const CameraContext& ctx);
-	CameraEvents update(const CameraContext& ctx);
-	Vec2 center() const;
+	void onEnter(const CameraContext& ctx) override;
+	CameraEvents update(const CameraContext& ctx) override;
+	Vec2 center() const override;
 };

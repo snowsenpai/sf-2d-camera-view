@@ -2,7 +2,7 @@
 
 #include "Vec2.h"
 #include "CameraTypes.h"
-#include "FixedCamera.h"
+#include "CameraManager.h"
 #include "EntityManager.h"
 #include "Entity.h"
 
@@ -27,11 +27,11 @@ class Game
 
 	Vec2 m_worldSize;
 
-	FixedCamera m_fixedCamera;
 	CameraContext makeCameraContext() const;
 	void onCameraEvent(const CameraEvents& ev);
-	void applyCameraCenter(const Vec2& center);
-	void sFixedCamera();
+
+	CameraManager m_cameraManager;
+	void sCamera();
 
 	std::random_device m_randomDevice;
 	mutable std::mt19937 m_engine{ m_randomDevice() }; // seeded once; rng() draws from this, not a fresh engine per call

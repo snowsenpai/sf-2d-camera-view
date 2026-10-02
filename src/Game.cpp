@@ -1,6 +1,8 @@
 #include "Game.h"
 #include "Vec2.h"
 #include "CameraTypes.h"
+#include "CameraManager.h"
+#include "FixedCamera.h"
 #include "Components.h"
 
 #include <SFML/Graphics.hpp>
@@ -27,7 +29,7 @@ void Game::update()
 	sPlayerInput();
 	sMovement();
 	sCollision();
-	sFixedCamera();
+	sCamera();
 	sRender();
 }
 
@@ -55,9 +57,12 @@ void Game::init()
 	m_worldSize = { static_cast<float>(bgTextureSize.x), static_cast<float>(bgTextureSize.y) };
 	
 	spawnPlayer();
-	m_fixedCamera.onEnter(makeCameraContext());
-	applyCameraCenter(m_fixedCamera.center());
-	
+
+	// CameraManager must be initialized before setting an active camera
+	m_cameraManager.init(m_window.getView());
+	m_cameraManager.add(CameraId::Fixed, std::make_unique<FixedCamera>());
+	m_cameraManager.setActive(CameraId::Fixed, makeCameraContext());
+
 	onResize(m_window.getSize());
 	m_running = true;
 }
@@ -210,7 +215,8 @@ void Game::sMovement()
 
 void Game::onResize(sf::Vector2u newSize)
 {
-	constexpr float targetAspect = 768.f / 512.f;
+	auto viewSize = m_cameraManager.view().getSize();
+	const float targetAspect = viewSize.x / viewSize.y;
 	const float windowAspect = static_cast<float>(newSize.x) / static_cast<float>(newSize.y);
 
 	auto viewPort = sf::FloatRect{ {0.f, 0.f}, {1.f, 1.f} };
@@ -225,12 +231,10 @@ void Game::onResize(sf::Vector2u newSize)
 	{
 		// window too tall: bars top and bottom
 		viewPort.size.y = windowAspect / targetAspect;
-		viewPort.position.y = (1.f - viewPort.size.x) / 2.f;
+		viewPort.position.y = (1.f - viewPort.size.y) / 2.f;
 	}
 
-	auto view = m_window.getView();
-	view.setViewport(viewPort);
-	m_window.setView(view);
+	m_cameraManager.setViewport(viewPort);
 }
 
 void Game::sPlayerInput()
@@ -242,7 +246,6 @@ void Game::sPlayerInput()
 			quit();
 		}
 
-		// this handler is dead code, window is created with sf::Style::Close
 		if (const auto* windowResized = event->getIf<sf::Event::Resized>())
 		{
 			onResize(windowResized->size);
@@ -294,18 +297,11 @@ void Game::sPlayerInput()
 	}
 }
 
-void Game::applyCameraCenter(const Vec2& center)
+void Game::sCamera()
 {
-	auto view = m_window.getView();
-	view.setCenter({ center.x, center.y });
-	m_window.setView(view);
-}
-
-void Game::sFixedCamera()
-{
-	auto ev = m_fixedCamera.update(makeCameraContext());
+	auto ev = m_cameraManager.update(makeCameraContext());
 	onCameraEvent(ev);
-	applyCameraCenter(m_fixedCamera.center());
+	m_window.setView(m_cameraManager.view());
 }
 
 CameraContext Game::makeCameraContext() const
