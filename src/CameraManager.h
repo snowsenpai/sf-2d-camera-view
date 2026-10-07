@@ -25,7 +25,7 @@ public:
 	void init(const sf::View& baseView);
 	void add(CameraId id, std::unique_ptr<Camera> camera);
 	
-	void setActive(CameraId id, const CameraContext & ctx);
+	void setActive(CameraId id, const CameraContext& ctx);
 	void setViewport(const sf::FloatRect& viewport);
 
 	CameraEvents update(const CameraContext& ctx);

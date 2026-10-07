@@ -25,6 +25,8 @@ add_executable(camera_view
     src/Components.h
     src/FixedCamera.h
     src/FixedCamera.cpp
+    src/FollowCamera.h
+    src/FollowCamera.cpp
     src/Entity.h
     src/Entity.cpp
     src/EntityManager.h

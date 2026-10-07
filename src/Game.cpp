@@ -3,6 +3,7 @@
 #include "CameraTypes.h"
 #include "CameraManager.h"
 #include "FixedCamera.h"
+#include "FollowCamera.h"
 #include "Components.h"
 
 #include <SFML/Graphics.hpp>
@@ -42,6 +43,7 @@ void Game::init()
 {
 	m_window.create(sf::VideoMode({ 768, 512 }), "Magic!", sf::Style::Default);
 	m_window.setFramerateLimit(60);
+	m_window.setKeyRepeatEnabled(false);
 
 	constexpr auto bgPath = "assets/fantasy_world_map1.png";
 	
@@ -61,6 +63,7 @@ void Game::init()
 	// CameraManager must be initialized before setting an active camera
 	m_cameraManager.init(m_window.getView());
 	m_cameraManager.add(CameraId::Fixed, std::make_unique<FixedCamera>());
+	m_cameraManager.add(CameraId::Follow, std::make_unique<FollowCamera>());
 	m_cameraManager.setActive(CameraId::Fixed, makeCameraContext());
 
 	onResize(m_window.getSize());
@@ -269,6 +272,12 @@ void Game::sPlayerInput()
 				break;
 			case sf::Keyboard::Key::C:
 				m_drawCollisison = !m_drawCollisison;
+				break;
+			case sf::Keyboard::Key::Num1:
+				m_cameraManager.setActive(CameraId::Fixed, makeCameraContext());
+				break;
+			case sf::Keyboard::Key::Num2:
+				m_cameraManager.setActive(CameraId::Follow, makeCameraContext());
 				break;
 			default:
 				break;

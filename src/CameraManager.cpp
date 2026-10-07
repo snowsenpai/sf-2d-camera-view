@@ -24,9 +24,11 @@ void CameraManager::add(CameraId id, std::unique_ptr<Camera> camera)
 void CameraManager::setActive(CameraId id, const CameraContext& ctx)
 {
 	auto& camera = *m_cameras.at(id);
+
+	if (m_active == &camera) return;
+	
 	camera.onEnter(ctx);
 	m_active = &camera;
-	syncView();
 }
 
 const sf::View& CameraManager::view() const
