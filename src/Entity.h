@@ -2,10 +2,12 @@
 
 #include "Components.h"
 
-#include <tuple>
-#include <string>
-#include <utility>
+#include <array>
 #include <optional>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
 
 class EntityManager;
 

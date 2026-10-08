@@ -1,16 +1,23 @@
-#include "Game.h"
-#include "Vec2.h"
-#include "CameraTypes.h"
 #include "CameraManager.h"
+#include "CameraTypes.h"
+#include "Components.h"
 #include "FixedCamera.h"
 #include "FollowCamera.h"
-#include "Components.h"
+#include "Game.h"
+#include "Vec2.h"
 
-#include <SFML/Graphics.hpp>
+#include <SFML/Graphics/CircleShape.hpp>
+#include <SFML/Graphics/Color.hpp>
+#include <SFML/Graphics/Rect.hpp>
+#include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/System/Vector2.hpp>
+#include <SFML/Window/Event.hpp>
+#include <SFML/Window/Keyboard.hpp>
+#include <SFML/Window/VideoMode.hpp>
+#include <SFML/Window/WindowEnums.hpp>
 
-#include <memory>
 #include <iostream>
+#include <memory>
 
 void Game::run()
 {
@@ -150,7 +157,17 @@ void Game::sRender()
 		}
 	}
 
+	if (m_drawCameraDebug)
+	{
+		sDrawCameraDebug(m_window);
+	}
+
 	m_window.display();
+}
+
+void Game::sDrawCameraDebug(sf::RenderTarget& target)
+{
+	m_cameraManager.debugDraw(target);
 }
 
 void Game::sCollision()
@@ -279,6 +296,9 @@ void Game::sPlayerInput()
 			case sf::Keyboard::Key::Num2:
 				m_cameraManager.setActive(CameraId::Follow, makeCameraContext());
 				break;
+			case sf::Keyboard::Key::Z:
+				m_drawCameraDebug = !m_drawCameraDebug;
+				break;
 			default:
 				break;
 			}
@@ -315,7 +335,7 @@ void Game::sCamera()
 
 CameraContext Game::makeCameraContext() const
 {
-	auto view = m_window.getView().getSize();
+	auto view = m_cameraManager.view().getSize();
 	const auto& pos = m_player->getComponent<CTransform>().value().pos;
 	return { pos, m_worldSize, {view.x, view.y} };
 }

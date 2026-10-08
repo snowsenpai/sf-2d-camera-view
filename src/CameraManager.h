@@ -1,8 +1,10 @@
 #pragma once
 
-#include "CameraTypes.h"
 #include "Camera.h"
+#include "CameraTypes.h"
 
+#include <SFML/Graphics/Rect.hpp>
+#include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/Graphics/View.hpp>
 
 #include <map>
@@ -29,6 +31,8 @@ public:
 	void setViewport(const sf::FloatRect& viewport);
 
 	CameraEvents update(const CameraContext& ctx);
+
+	void debugDraw(sf::RenderTarget& target) const;
 	
 	const sf::View& view() const;
 };

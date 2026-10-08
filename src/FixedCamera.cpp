@@ -1,11 +1,15 @@
 #include "CameraTypes.h"
 #include "FixedCamera.h"
+#include "Vec2.h"
 
+#include <SFML/Graphics/Color.hpp>
+#include <SFML/Graphics/RectangleShape.hpp>
+#include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/System/Vector2.hpp>
 
-#include <cmath>
-#include <cassert>
 #include <algorithm>
+#include <cassert>
+#include <cmath>
 
 void FixedCamera::onEnter(const CameraContext& ctx)
 {
@@ -68,4 +72,18 @@ sf::Vector2i FixedCamera::cellFromPos(const Vec2& pos) const
 		std::clamp(col, 0, m_gridSize.x - 1),
 		std::clamp(row, 0, m_gridSize.y - 1)
 	};
+}
+
+void FixedCamera::debugDraw(sf::RenderTarget& target) const
+{
+
+	auto cellCenter = center();
+
+	auto r = sf::RectangleShape({ 16.f,16.f });
+	r.setOrigin({ 8.f,8.f });
+	r.setPosition({ cellCenter.x, cellCenter.x });
+	r.setFillColor(sf::Color::Transparent);
+	r.setOutlineColor(sf::Color::Cyan);
+	r.setOutlineThickness(1.f);
+	target.draw(r);
 }

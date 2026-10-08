@@ -1,20 +1,21 @@
 #pragma once
 
-#include "Vec2.h"
-#include "CameraTypes.h"
 #include "CameraManager.h"
-#include "EntityManager.h"
+#include "CameraTypes.h"
 #include "Entity.h"
+#include "EntityManager.h"
+#include "Vec2.h"
 
+#include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Graphics/Sprite.hpp>
 #include <SFML/Graphics/Texture.hpp>
 #include <SFML/System/Vector2.hpp>
 
 #include <memory>
-#include <type_traits>
-#include <random>
 #include <optional>
+#include <random>
+#include <type_traits>
 
 class Game
 {
@@ -38,6 +39,7 @@ class Game
 
 	bool m_running = false;
 	bool m_drawCollisison = false;
+	bool m_drawCameraDebug = false;
 
 	void init();
 	void update();
@@ -49,6 +51,8 @@ class Game
 	void sPlayerInput();
 	void sMovement();
 	void sCollision();
+
+	void sDrawCameraDebug(sf::RenderTarget& target);
 
 	const float kRoomMargin = 4.f;
 

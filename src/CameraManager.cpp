@@ -1,12 +1,14 @@
 #include "Camera.h"
-#include "CameraTypes.h"
 #include "CameraManager.h"
+#include "CameraTypes.h"
 
+#include <SFML/Graphics/Rect.hpp>
+#include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/Graphics/View.hpp>
 
+#include <cassert>
 #include <map>
 #include <memory>
-#include <cassert>
 #include <utility>
 
 void CameraManager::init(const sf::View& baseView)
@@ -55,4 +57,10 @@ CameraEvents CameraManager::update(const CameraContext& ctx)
 	auto ev = m_active->update(ctx);
 	syncView();
 	return ev;
+}
+
+
+void CameraManager::debugDraw(sf::RenderTarget& target) const
+{
+	m_active->debugDraw(target);
 }
