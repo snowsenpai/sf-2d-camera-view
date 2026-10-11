@@ -10,6 +10,7 @@
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/Graphics/Rect.hpp>
 #include <SFML/Graphics/RectangleShape.hpp>
+#include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/System/Vector2.hpp>
 #include <SFML/Window/Event.hpp>
 #include <SFML/Window/Keyboard.hpp>
@@ -18,6 +19,7 @@
 
 #include <iostream>
 #include <memory>
+#include <algorithm>
 
 void Game::run()
 {
@@ -34,10 +36,16 @@ void Game::update()
 {
 	m_entityManager.update();
 
-	sPlayerInput();
-	sMovement();
-	sCollision();
-	sCamera();
+	// clamp: a stall (window drag, breakpoint) must not become one giant step. Needs <algorithm>.
+	auto dt = std::min(m_frameClock.restart().asSeconds(), 0.1f);
+
+	sPlayerInput(); // always runs: close/resize/key releases
+	if (!m_cameraManager.blocksGameplay())
+	{
+		sMovement();
+		sCollision();
+	}
+	sCamera(dt);                                     // always runs, or the slide never finishes
 	sRender();
 }
 
@@ -110,7 +118,44 @@ void Game::sRender()
 {
 	m_window.clear();
 
-	// draw background
+	m_window.setView(m_cameraManager.view());
+
+	drawWorld();
+
+	if (m_drawCameraDebug)
+	{
+		sDrawCameraDebug(m_window);
+	}
+
+	if (m_miniViewVisible)
+	{
+		const auto& miniView = m_cameraManager.miniView();
+		m_window.setView(miniView);
+
+		auto back = sf::RectangleShape(miniView.getSize());
+		back.setOrigin(miniView.getSize() / 2.f);
+		back.setPosition(miniView.getCenter());
+		back.setFillColor(sf::Color(0, 0, 0, 180));
+		m_window.draw(back);
+
+		drawWorld();
+		
+		// footprint of the main view, drawn in the mini view's world units
+		const auto& main = m_cameraManager.view();
+		sf::RectangleShape footprint(main.getSize());
+		footprint.setOrigin(main.getSize() / 2.f);
+		footprint.setPosition(main.getCenter());
+		footprint.setFillColor(sf::Color::Transparent);
+		footprint.setOutlineColor(sf::Color::White);
+		footprint.setOutlineThickness(24.f);   // about 2 screen px: 2 / (fraction / ratio) = 2 / (0.25 / 3)
+		m_window.draw(footprint);
+	}
+
+	m_window.display();
+}
+
+void Game::drawWorld()
+{
 	m_window.draw(m_bgImage.value());
 
 	for (auto& e : m_entityManager.getEntities())
@@ -119,17 +164,17 @@ void Game::sRender()
 
 		auto& entityCircle = e->getComponent<CShape>().value().circle;
 		auto& entityPos = e->getComponent<CTransform>().value().pos;
-		
+
 		entityCircle.setPosition({ entityPos.x, entityPos.y });
 
 		m_window.draw(entityCircle);
-		
+
 		if (m_drawCollisison)
 		{
 			if (e->hasComponent<CBoundingBox>())
 			{
 				auto& eBox = e->getComponent<CBoundingBox>().value().size;
-			
+
 				sf::RectangleShape box({ eBox.x, eBox.y });
 
 				box.setOrigin({ eBox.x / 2.f, eBox.y / 2.f });
@@ -137,7 +182,7 @@ void Game::sRender()
 				box.setOutlineColor(sf::Color::Green);
 				box.setFillColor(sf::Color::Transparent);
 				box.setOutlineThickness(1.f);
-			
+
 				m_window.draw(box);
 			}
 			else if (e->hasComponent<CBoundingCircle>())
@@ -156,13 +201,6 @@ void Game::sRender()
 			}
 		}
 	}
-
-	if (m_drawCameraDebug)
-	{
-		sDrawCameraDebug(m_window);
-	}
-
-	m_window.display();
 }
 
 void Game::sDrawCameraDebug(sf::RenderTarget& target)
@@ -271,6 +309,11 @@ void Game::sPlayerInput()
 			onResize(windowResized->size);
 		}
 
+		if (const auto* wheel = event->getIf<sf::Event::MouseWheelScrolled>())
+		{
+			m_cameraManager.zoomBy(wheel->delta > 0.f ? 1.1f : 1.f / 1.1f);
+		}
+
 		if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>())
 		{
 			switch (keyPressed->code)
@@ -299,6 +342,9 @@ void Game::sPlayerInput()
 			case sf::Keyboard::Key::Z:
 				m_drawCameraDebug = !m_drawCameraDebug;
 				break;
+			case sf::Keyboard::Key::X:
+				m_miniViewVisible = !m_miniViewVisible;
+				break;
 			default:
 				break;
 			}
@@ -326,18 +372,18 @@ void Game::sPlayerInput()
 	}
 }
 
-void Game::sCamera()
+void Game::sCamera(float deltaTime)
 {
-	auto ev = m_cameraManager.update(makeCameraContext());
+	auto ev = m_cameraManager.update(makeCameraContext(deltaTime));
 	onCameraEvent(ev);
 	m_window.setView(m_cameraManager.view());
 }
 
-CameraContext Game::makeCameraContext() const
+CameraContext Game::makeCameraContext(float deltaTime) const
 {
-	auto view = m_cameraManager.view().getSize();
 	const auto& pos = m_player->getComponent<CTransform>().value().pos;
-	return { pos, m_worldSize, {view.x, view.y} };
+	// the BASE size: each camera derives its own zoomed size from it
+	return { pos, m_worldSize, m_cameraManager.baseViewSize(), deltaTime};
 }
 
 void Game::onCameraEvent(const CameraEvents& ev)

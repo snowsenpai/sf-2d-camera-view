@@ -13,11 +13,11 @@
 
 void FixedCamera::onEnter(const CameraContext& ctx)
 {
-	m_cellSize = { ctx.viewSize.x, ctx.viewSize.y };
+	m_cellSize = { ctx.baseViewSize.x, ctx.baseViewSize.y };
 	
 	m_gridSize = {
 		static_cast<int>(ctx.worldSize.x / m_cellSize.x),
-		static_cast<int>(ctx.worldSize.x / m_cellSize.y)
+		static_cast<int>(ctx.worldSize.y / m_cellSize.y)
 	};
 
 	// the world must tile exactly with cells, or the view could show void
@@ -25,18 +25,37 @@ void FixedCamera::onEnter(const CameraContext& ctx)
 	assert(std::fmod(ctx.worldSize.y, m_cellSize.y) == 0.f);
 
 	m_currentCell = cellFromPos(ctx.targetPos);
+	m_center = cellCenter(m_currentCell);
+	m_state = State::Idle; // cancels any slide left over from last time
 }
 
-Vec2 FixedCamera::center() const
+Vec2 FixedCamera::cellCenter(sf::Vector2i cell) const
 {
-	// cells are positioned by top-left, the view by center, hence the + 0.5
-	return { (m_currentCell.x + 0.5f) * m_cellSize.x, (m_currentCell.y + 0.5f) * m_cellSize.y };
+	return { (cell.x + 0.5f) * m_cellSize.x, (cell.y + 0.5f) * m_cellSize.y };
 }
+
+Vec2 FixedCamera::center() const { return m_center; }
 
 CameraEvents FixedCamera::update(const CameraContext& ctx)
 {
-	auto ev = CameraEvents{};
-	auto newCell = cellFromPos(ctx.targetPos);
+	CameraEvents ev;
+
+	if (m_state == State::Sliding)
+	{
+		m_slideElapsed += ctx.deltaTime;
+		const float t = std::min(m_slideElapsed / kSlideDuration, 1.f);
+		const float e = t * t * (3.f - 2.f * t);               // smoothstep easing
+
+		m_center = {
+			m_slideFrom.x + (m_slideTo.x - m_slideFrom.x) * e,
+			m_slideFrom.y + (m_slideTo.y - m_slideFrom.y) * e
+		};
+
+		if (t >= 1.f) m_state = State::Idle;
+		return ev;                                             // crossings are ignored while sliding
+	}
+
+	const sf::Vector2i newCell = cellFromPos(ctx.targetPos);
 	if (newCell == m_currentCell) return ev;
 
 	int dx = newCell.x - m_currentCell.x;
@@ -58,6 +77,10 @@ CameraEvents FixedCamera::update(const CameraContext& ctx)
 		};
 	}
 
+	m_slideFrom = m_center;
+	m_slideTo = cellCenter(newCell);
+	m_slideElapsed = 0.f;
+	m_state = State::Sliding;
 	m_currentCell = newCell;
 	return ev;
 }
@@ -76,14 +99,10 @@ sf::Vector2i FixedCamera::cellFromPos(const Vec2& pos) const
 
 void FixedCamera::debugDraw(sf::RenderTarget& target) const
 {
-
-	auto cellCenter = center();
-
-	auto r = sf::RectangleShape({ 16.f,16.f });
-	r.setOrigin({ 8.f,8.f });
-	r.setPosition({ cellCenter.x, cellCenter.x });
-	r.setFillColor(sf::Color::Transparent);
-	r.setOutlineColor(sf::Color::Cyan);
-	r.setOutlineThickness(1.f);
-	target.draw(r);
+	auto cell = sf::RectangleShape({ m_cellSize.x, m_cellSize.y });
+	cell.setPosition({ m_currentCell.x * m_cellSize.x, m_currentCell.y * m_cellSize.y });
+	cell.setFillColor(sf::Color::Transparent);
+	cell.setOutlineColor(sf::Color::Cyan);
+	cell.setOutlineThickness(-2.f);                            // negative: drawn inward, stays inside the cell
+	target.draw(cell);
 }

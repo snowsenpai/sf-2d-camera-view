@@ -4,6 +4,7 @@
 
 #include <SFML/Graphics/Rect.hpp>
 #include <SFML/Graphics/RenderTarget.hpp>
+#include <SFML/System/Vector2.hpp>
 #include <SFML/Graphics/View.hpp>
 
 #include <cassert>
@@ -14,6 +15,12 @@
 void CameraManager::init(const sf::View& baseView)
 {
 	m_view = baseView;
+	m_baseSize = { baseView.getSize().x, baseView.getSize().y };
+}
+
+bool CameraManager::blocksGameplay() const
+{
+	return m_active && m_active->blocksGameplay();
 }
 
 void CameraManager::add(CameraId id, std::unique_ptr<Camera> camera)
@@ -38,17 +45,50 @@ const sf::View& CameraManager::view() const
 	return m_view;
 }
 
-void CameraManager::setViewport(const sf::FloatRect& viewport)
+const sf::View& CameraManager::miniView() const
 {
-	m_view.setViewport(viewport);
+	return m_miniView;
 }
 
-// copy the camera's new center into m_view
+void CameraManager::setViewport(const sf::FloatRect& main)
+{
+	m_view.setViewport(main);
+
+	constexpr float margin = 0.02f; // of the game area, so it can't land in the letterbox bars
+	sf::FloatRect mini;
+	mini.size = {
+		mini.size.x * m_miniFraction,
+		mini.size.y * m_miniFraction,
+	};
+	mini.position = {
+		main.position.x + main.size.x * (1.f - m_miniFraction - margin), // right side of the game area
+		main.position.y + main.size.y * margin // top
+	};
+	m_miniView.setViewport(mini);
+}
+
+void CameraManager::zoomBy(float factor)
+{
+	if (m_active) m_active->zoomBy(factor);
+}
+
+// CameraManager::syncView: absolute size, not View::zoom(), which is relative and drifts
 void CameraManager::syncView()
 {
 	if (!m_active) return;
-	auto c = m_active->center();
-	m_view.setCenter({ c.x, c.y });
+	
+	const auto c = m_active->center();
+	const auto z = m_active->zoom();
+	const auto size = sf::Vector2f{ m_baseSize.x / z,m_baseSize.y / z };
+	const auto half = size / 2.f;
+
+	m_view.setSize(size);
+	// Pixel alignment: snap the view's TOP-LEFT to whole pixels, not the center.
+	// With a fractional size (zoom), only the top-left stays aligned.
+	m_view.setCenter({ std::round(c.x - half.x) + half.x, std::round(c.y - half.y) + half.y });
+
+	m_miniView.setCenter(m_view.getCenter());
+	m_miniView.setSize({ size.x * m_miniRatio, size.y * m_miniRatio });
 }
 
 CameraEvents CameraManager::update(const CameraContext& ctx)

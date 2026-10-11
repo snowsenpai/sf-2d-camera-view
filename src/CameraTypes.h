@@ -8,7 +8,8 @@ struct CameraContext
 {
 	Vec2 targetPos; // center of what the camera follows (the player)
 	Vec2 worldSize;
-	Vec2 viewSize;
+	Vec2 baseViewSize;
+	float deltaTime = 0.f;
 };
 
 struct EdgeCrossing

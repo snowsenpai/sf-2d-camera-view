@@ -6,6 +6,7 @@
 #include "EntityManager.h"
 #include "Vec2.h"
 
+#include <SFML/System/Clock.hpp>
 #include <SFML/Graphics/RenderTarget.hpp>
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/Graphics/Sprite.hpp>
@@ -20,19 +21,22 @@
 class Game
 {
 	EntityManager m_entityManager;
+	CameraManager m_cameraManager;
+
 	sf::RenderWindow m_window;
+
 	std::shared_ptr<Entity> m_player;
+
+	sf::Clock m_frameClock;
 
 	sf::Texture m_bgTexture;
 	std::optional<sf::Sprite> m_bgImage;
 
 	Vec2 m_worldSize;
 
-	CameraContext makeCameraContext() const;
+	CameraContext makeCameraContext(float deltaTime = 0.f) const;
 	void onCameraEvent(const CameraEvents& ev);
 
-	CameraManager m_cameraManager;
-	void sCamera();
 
 	std::random_device m_randomDevice;
 	mutable std::mt19937 m_engine{ m_randomDevice() }; // seeded once; rng() draws from this, not a fresh engine per call
@@ -40,6 +44,7 @@ class Game
 	bool m_running = false;
 	bool m_drawCollisison = false;
 	bool m_drawCameraDebug = false;
+	bool m_miniViewVisible = false;
 
 	void init();
 	void update();
@@ -51,7 +56,9 @@ class Game
 	void sPlayerInput();
 	void sMovement();
 	void sCollision();
+	void sCamera(float deltaTime);
 
+	void drawWorld();
 	void sDrawCameraDebug(sf::RenderTarget& target);
 
 	const float kRoomMargin = 4.f;
