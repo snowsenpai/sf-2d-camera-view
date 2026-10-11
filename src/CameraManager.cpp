@@ -57,8 +57,8 @@ void CameraManager::setViewport(const sf::FloatRect& main)
 	constexpr float margin = 0.02f; // of the game area, so it can't land in the letterbox bars
 	sf::FloatRect mini;
 	mini.size = {
-		mini.size.x * m_miniFraction,
-		mini.size.y * m_miniFraction,
+		main.size.x * m_miniFraction,
+		main.size.y * m_miniFraction,
 	};
 	mini.position = {
 		main.position.x + main.size.x * (1.f - m_miniFraction - margin), // right side of the game area
