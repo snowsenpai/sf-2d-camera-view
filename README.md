@@ -1,117 +1,165 @@
-# CMake SFML Project Template
+# 2D Camera Sandbox
 
-This repository template should allow for a fast and hassle-free kick start of your next SFML project using CMake.
-Thanks to [GitHub's nature of templates](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template), you can fork this repository without inheriting its Git history.
+A C++17 / SFML 3 sandbox for implementing and comparing 2D camera systems.
 
-The template starts out very basic, but might receive additional features over time:
+## Overview
 
-- Basic CMake script to build your project and link SFML on any operating system
-- Basic [GitHub Actions](https://github.com/features/actions) script for all major platforms
+The sandbox is a small playable scene: a circle-shaped player moves around a background map that is larger than the window, and different cameras can be swapped at runtime to see how each one frames the world.
 
-## Quick start
+It exists as a practical environment for studying camera architecture, coordinate spaces and camera mathematics, and for testing how cameras interact with gameplay. For example, a room change repositions the player and pauses movement while the view slides to the next room.
 
-### Command line
+## Features
 
-1. Install [Git](https://git-scm.com/downloads) and [CMake](https://cmake.org/download/). Use your system's package manager if available.
-2. Follow [GitHub's instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template) for how to use their project template feature to create your own project. If you don't want to use GitHub, see the section below.
-3. Clone your new GitHub repo and open the repo in your text editor of choice.
-4. Open [CMakeLists.txt](CMakeLists.txt). Rename the project and the target name of the executable to whatever name you want. Make sure to change all occurrences.
-5. If you want to add or remove any .cpp files, change the source files listed in the `add_executable` call in CMakeLists.txt to match the source files your project requires. If you plan on keeping the default main.cpp file then no changes are required.
-6. If your code uses the Audio or Network modules then add `SFML::Audio` or `SFML::Network` to the `target_link_libraries` call alongside the existing `SFML::Graphics` library that is being linked.
-7. If you use Linux, install SFML's dependencies using your system package manager. On Ubuntu and other Debian-based distributions you can use the following commands:
-   ```
-   sudo apt update
-   sudo apt install \
-       libxrandr-dev \
-       libxcursor-dev \
-       libxi-dev \
-       libudev-dev \
-       libfreetype-dev \
-       libflac-dev \
-       libvorbis-dev \
-       libgl1-mesa-dev \
-       libegl1-mesa-dev \
-       libfreetype-dev \
-       libharfbuzz-dev \
-       libmbedtls-dev \
-       libssh2-1-dev
-   ```
-8. Configure and build your project. Most popular IDEs support CMake projects with very little effort on your part.
+### Fixed (room-based) camera
 
-   - [VS Code](https://code.visualstudio.com) via the [CMake extension](https://code.visualstudio.com/docs/cpp/cmake-linux)
-   - [Visual Studio](https://docs.microsoft.com/en-us/cpp/build/cmake-projects-in-visual-studio?view=msvc-170)
-   - [CLion](https://www.jetbrains.com/clion/features/cmake-support.html)
-   - [Qt Creator](https://doc.qt.io/qtcreator/creator-project-cmake.html)
+The world is divided into a grid of rooms, each the size of the view. With the default 768x512 window and the included 1536x1024 map, this produces a 2x2 grid. The current room is derived from the player's position. When the player's center leaves it, the camera slides to the neighboring room's center over 0.45 seconds with eased motion, gameplay is paused for the duration of the slide, and the player is repositioned just inside the new room.
 
-   Using CMake from the command line is straightforward as well.
-   Be sure to run these commands in the root directory of the project you just created.
+The fixed camera ignores zoom. It requires the world size to be an exact multiple of the view size, which is asserted on activation.
 
-   ```
-   cmake -B build
-   cmake --build build
-   ```
+Typical uses: top-down adventures, puzzle games, and any design where each screen is a self-contained space.
 
-9. Enjoy!
+### Follow camera
+
+The camera tracks the player with the following behaviors:
+
+- **Dead zone:** the camera stays still while the player moves inside a rectangle around the view center (default half-size 64x48 world units), and moves only enough to keep the player inside it.
+- **Smoothing:** the camera center eases toward its target with a frame-rate-independent exponential catch-up (default rate 8 per second; 0 disables smoothing).
+- **World clamping:** the view never extends outside the world.
+- **Zoom:** 0.5x to 3.0x with the mouse wheel.
+- **Activation:** on activation the camera snaps to the player's position, clamped to the world.
+
+Typical uses: platformers, scrolling levels, and open-ended exploration where the world is larger than the screen.
+
+### Shared features
+
+- **Camera switching:** cameras are registered with the manager and switched at runtime. Switching is an instant cut; the new camera initializes from the player's current position.
+- **Mini-map:** a toggleable second view in the top-right corner of the game area. It covers 25% of the game area's width and height, shows three times the extent of the main view, and outlines the main view's footprint.
+- **Debug visualization:** the fixed camera outlines the current room; the follow camera draws its dead zone. A separate overlay shows collision boxes.
+- **Viewport resizing:** the window can be resized. The view keeps its aspect ratio with letterbox bars, and the mini-map viewport is derived from the letterboxed area so it never lands in the bars.
+- **Pixel-aligned view:** the top-left corner of the view is snapped to whole pixels to avoid shimmering while scrolling.
+
+## Technologies
+
+| Technology | Details |
+| --- | --- |
+| C++ | C++17 |
+| SFML | 3.1.0, Graphics module, fetched from GitHub by CMake `FetchContent` |
+| CMake | 3.28 or newer |
+
+There are no other third-party dependencies.
+
+## Project architecture
+
+| Component | Responsibility |
+| --- | --- |
+| `Camera` | Common interface: `onEnter`, `update`, `center`, plus optional `zoom`, `zoomBy`, `blocksGameplay` and a debug draw hook. |
+| `FixedCamera` | Room grid, room detection, and the timed slide between rooms. |
+| `FollowCamera` | Dead zone, smoothing, world clamping and zoom. |
+| `CameraManager` | Owns the registered cameras, tracks the active one, owns the main and mini-map views, and applies each camera's center and zoom to the view. Also handles viewports. |
+| `CameraContext`, `CameraEvents` | Input data a camera receives each frame, and the events it reports back. |
+| `Game` | Gameplay integration: input, movement, collision, the per-frame camera update, and rendering. |
+
+`Vec2`, `Entity`, `EntityManager` and `Components` form a minimal entity layer that supports the demo scene.
+
+Each frame, `Game` builds a `CameraContext` (player position, world size, base view size, delta time) and passes it to the manager, which forwards it to the active camera. The camera updates its own state and returns `CameraEvents`; the manager copies the camera's center and zoom into the SFML view. Cameras never touch the player or the window. When the fixed camera changes rooms, it reports the crossed edge in `CameraEvents` and `Game` repositions the player. `Game` asks the manager whether the active camera blocks gameplay, and skips movement and collision while it does.
+
+Frame order:
+
+```cmd
+input -> movement + collision (skipped while a camera blocks gameplay)
+      -> camera update, then Game reacts to CameraEvents
+      -> render (main view, optional debug overlay, optional mini-map)
+```
+
+### Directory structure
+
+```cmd
+sf-2d-camera-view/
+|-- CMakeLists.txt
+|-- assets/
+|   `-- fantasy_world_map1.png
+`-- src/
+    |-- main.cpp
+    |-- Game.h / Game.cpp
+    |-- Camera.h                 common camera interface
+    |-- CameraTypes.h            CameraContext, CameraEvents
+    |-- CameraManager.h / .cpp
+    |-- FixedCamera.h / .cpp
+    |-- FollowCamera.h / .cpp
+    |-- Vec2.h / Vec2.cpp
+    |-- Components.h
+    |-- Entity.h / Entity.cpp
+    `-- EntityManager.h / EntityManager.cpp
+```
+
+## Building and running
+
+### Prerequisites
+
+- CMake 3.28 or newer.
+- A C++17 compiler. The project is developed on Windows with Visual Studio (the "Desktop development with C++" workload).
+- Git, and an internet connection on the first configure: SFML 3.1.0 is downloaded from GitHub and built alongside the project, so the first build takes longer.
 
 ### Visual Studio
 
-Using a Visual Studio workspace is the simplest way to get started on windows.
+1. Open the repository folder (File > Open > Folder).
+2. Wait for CMake to finish configuring.
+3. Select `camera_view` as the startup item and run.
 
-1. Ensure you have the [required components installed](https://learn.microsoft.com/en-us/cpp/build/cmake-projects-in-visual-studio#installation).
-2. Follow [GitHub's instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template) for how to use their project template feature to create your own project.
-3. If you have already cloned this repo, you can [open the folder](https://learn.microsoft.com/en-us/cpp/build/cmake-projects-in-visual-studio0#ide-integration).
-4. If not, you can [clone it directly in Visual Studio](https://learn.microsoft.com/en-us/visualstudio/get-started/tutorial-open-project-from-repo).
+### Command line
 
-Visual Studio should automatically configure the CMake project, then you can build and run as normal through Visual Studio. See the links above for more details.
+```cmd
+cmake -B build
+cmake --build build --config Release
+```
 
-## Upgrading SFML
+`--config` applies to multi-configuration generators such as the Visual Studio generator. With single-configuration generators (Ninja, Makefiles), pass `-DCMAKE_BUILD_TYPE=Release` at the configure step instead.
 
-SFML is found via CMake's [FetchContent](https://cmake.org/cmake/help/latest/module/FetchContent.html) module.
-FetchContent automatically downloads SFML from GitHub and builds it alongside your own code.
-Beyond the convenience of not having to install SFML yourself, this ensures ABI compatibility and simplifies things like specifying static versus shared libraries.
+### Running
 
-Modifying what version of SFML you want is as easy as changing the `GIT_TAG` argument.
-Currently it uses SFML 3 via the `3.1.0` tag.
+The executable `camera_view` is written to `bin/` inside the build directory, with a configuration subfolder such as `Release` under multi-configuration generators. For example, with the Visual Studio generator:
 
-## But I want to...
+```cmd
+build\bin\Release\camera_view.exe
+```
 
-Modify CMake options by adding them as configuration parameters (with a `-D` flag) or by modifying the contents of CMakeCache.txt and rebuilding.
+The game loads `assets/fantasy_world_map1.png` relative to the working directory. A post-build step copies the `assets/` folder next to the executable (only if the folder exists when CMake configures), so launch the program from the directory that contains the executable. When launching from an IDE, set the working directory to that folder. If the texture cannot be loaded, the game prints a message to the console.
 
-### Not use GitHub
+The project has been built and run only on Windows. The CMake configuration is not Windows-specific, but other platforms are untested, and building SFML from source on Linux needs additional system packages; see the SFML documentation.
 
-You can use this project without a GitHub account by [downloading the contents](https://github.com/SFML/cmake-sfml-project/archive/refs/heads/master.zip) of the repository as a ZIP archive and unpacking it locally.
-This approach also avoids using Git entirely if you would prefer to not do that.
+## Controls
 
-### Change Compilers
+| Input | Action |
+| --- | --- |
+| `W` `A` `S` `D` | Move the player (one direction at a time; priority up, down, left, right) |
+| `1` | Switch to the fixed camera |
+| `2` | Switch to the follow camera |
+| Mouse wheel | Zoom (follow camera only) |
+| `X` | Toggle the mini-map |
+| `Z` | Toggle the camera debug overlay |
+| `C` | Toggle the collision-box overlay |
+| Window resize | Letterbox the view to its aspect ratio |
 
-See the variety of [`CMAKE_<LANG>_COMPILER`](https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_COMPILER.html) options.
-In particular you'll want to modify `CMAKE_CXX_COMPILER` to point to the C++ compiler you wish to use.
+Key presses register once per press; key repeat is disabled.
 
-### Change Compiler Optimizations
+## Camera concepts explored
 
-CMake abstracts away specific optimizer flags through the [`CMAKE_BUILD_TYPE`](https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html) option.
-By default this project recommends `Release` builds which enable optimizations.
-Other build types include `Debug` builds which enable debug symbols but disable optimizations.
-If you're using a multi-configuration generator (as is often the case on Windows), you can modify the [`CMAKE_CONFIGURATION_TYPES`](https://cmake.org/cmake/help/latest/variable/CMAKE_CONFIGURATION_TYPES.html#variable:CMAKE_CONFIGURATION_TYPES) option.
+- **World space versus screen space:** all gameplay and camera values are in world coordinates (pixels, origin at top-left, y pointing down). The view maps a region of world space onto the window, and the viewport decides which part of the window it occupies.
+- **View size and center:** a view is defined by its center and size in world units. Zoom changes the size (base size divided by zoom) while the aspect ratio stays fixed.
+- **Dead-zone tracking:** the camera's offset from the target is compared with a half-window size per axis, and the camera moves only by the amount the target exceeds it.
+- **World-boundary clamping:** the valid camera centers on each axis range from half the view size to the world size minus half the view size. If the world is smaller than the view on an axis, the camera centers on the world along that axis.
+- **Smoothing:** the camera moves a fraction `1 - exp(-rate * dt)` of the remaining distance each frame, which gives the same motion regardless of frame rate.
+- **Room-based transitions:** the room is derived from the player's position, the camera interpolates between room centers, and gameplay reacts through events and a query instead of the camera modifying game state.
+- **Viewports and the mini-map:** viewports use normalized window coordinates. Defining the mini-map viewport as a sub-rectangle of the letterboxed main viewport lets it follow the window size without separate resize logic, and keeping the same aspect ratio avoids distortion.
 
-### Change Generators
+## Future improvements
 
-While CMake will attempt to pick a suitable default generator, some systems offer a number of generators to choose from.
-Ubuntu, for example, offers Makefiles and Ninja as two potential options.
-For a list of generators, click [here](https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html).
-To modify the generator you're using you must reconfigure your project providing a `-G` flag with a value corresponding to the generator you want.
-You can't simply modify an entry in the CMakeCache.txt file unlike the above options.
-Then you may rebuild your project with this new generator.
+These are ideas, not implemented features and not a committed roadmap.
 
-## More Reading
-
-Here are some useful resources if you want to learn more about CMake:
-
-- [Official CMake Tutorial](https://cmake.org/cmake/help/latest/guide/tutorial/)
-- [How to Use CMake Without the Agonizing Pain - Part 1](https://alexreinking.com/blog/how-to-use-cmake-without-the-agonizing-pain-part-1.html)
-- [How to Use CMake Without the Agonizing Pain - Part 2](https://alexreinking.com/blog/how-to-use-cmake-without-the-agonizing-pain-part-2.html)
-- [Better CMake YouTube series by Jefferon Amstutz](https://www.youtube.com/playlist?list=PL8i3OhJb4FNV10aIZ8oF0AA46HgA2ed8g)
-
-## License
-
-The source code is dual licensed under Public Domain and MIT -- choose whichever you prefer.
+- Blend between cameras when switching, instead of an instant cut.
+- Make room transition toggleable.
+- Debug gui(via SFMLImGui) to show active camera and settings(hopefully realtime).
+- Look-ahead framing for the follow camera.
+- Define zoom behavior for the fixed camera (for example, following the player within a room).
+- Make the follow camera's dead zone and smoothing adjustable at runtime; they are currently set through default configuration values.
+- Per-camera mini-map settings (center and ratio); the ratio is currently fixed at 3x.
